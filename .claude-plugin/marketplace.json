@@ -1,0 +1,16 @@
+{
+  "name": "groundwork-ai",
+  "description": "Groundwork AI plugins for AI Brain folders.",
+  "owner": {
+    "name": "Groundwork AI",
+    "email": "isaacn901@gmail.com",
+    "url": "https://groundworkai.nz"
+  },
+  "plugins": [
+    {
+      "name": "groundwork-brain",
+      "source": "./plugins/groundwork-brain",
+      "description": "Five skills for running an AI Brain folder: prime, ingest, wrap up, health check, weekly digest."
+    }
+  ]
+}
