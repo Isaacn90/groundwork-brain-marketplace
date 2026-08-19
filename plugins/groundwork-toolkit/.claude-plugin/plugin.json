@@ -1,0 +1,14 @@
+{
+  "name": "groundwork-toolkit",
+  "displayName": "Groundwork Toolkit",
+  "version": "1.0.0",
+  "description": "GroundWork AI's everyday toolkit: professional design for anything visual, writing that sounds like a person, the business's own voice, honest checks on new ideas, and a steady way of working through big multi-part jobs.",
+  "author": {
+    "name": "Groundwork AI",
+    "email": "isaacn901@gmail.com",
+    "url": "https://groundworkai.nz"
+  },
+  "homepage": "https://groundworkai.nz",
+  "repository": "https://github.com/Isaacn90/groundwork-brain-marketplace",
+  "keywords": ["design", "writing", "voice", "planning", "groundwork"]
+}

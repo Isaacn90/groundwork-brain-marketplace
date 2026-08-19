@@ -1,14 +1,20 @@
 {
   "name": "groundwork-brain",
   "displayName": "Groundwork Brain",
-  "version": "1.1.0",
-  "description": "Six skills for running an AI Brain folder: catch up at the start of a session, file new documents, save what a session learned, check the brain for problems, draft a weekly digest, and action the feedback a client left on their preview site.",
+  "version": "1.2.0",
+  "description": "Eight skills for running an AI Brain folder: catch up at the start of a session, file new documents, save what a session learned, check the brain for problems, draft a weekly digest, action the feedback a client left on their preview site, turn a recurring job into an automation, and Gus the Groundskeeper's weekly walk of the rules.",
   "author": {
     "name": "Groundwork AI",
     "email": "isaacn901@gmail.com",
     "url": "https://groundworkai.nz"
   },
   "homepage": "https://groundworkai.nz",
-  "repository": "https://github.com/Isaacn90/GroundWorkAI",
-  "keywords": ["ai-brain", "knowledge-base", "wiki", "ingestion", "groundwork"]
+  "repository": "https://github.com/Isaacn90/groundwork-brain-marketplace",
+  "keywords": [
+    "ai-brain",
+    "knowledge-base",
+    "wiki",
+    "ingestion",
+    "groundwork"
+  ]
 }

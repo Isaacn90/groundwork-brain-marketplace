@@ -1,0 +1,14 @@
+{
+  "name": "groundwork-build",
+  "displayName": "Groundwork Build",
+  "version": "1.0.0",
+  "description": "One skill, used once: brain-build turns a business's documents into a working AI Brain, in conversation. It is a delivery tool, not part of running a brain. Remove it after handover.",
+  "author": {
+    "name": "Groundwork AI",
+    "email": "isaacn901@gmail.com",
+    "url": "https://groundworkai.nz"
+  },
+  "homepage": "https://groundworkai.nz",
+  "repository": "https://github.com/Isaacn90/groundwork-brain-marketplace",
+  "keywords": ["ai-brain", "onboarding", "install", "groundwork"]
+}

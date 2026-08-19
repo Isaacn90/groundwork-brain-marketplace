@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="Gus the Groundskeeper">
+  <defs>
+    <clipPath id="badge"><circle cx="120" cy="120" r="108"/></clipPath>
+  </defs>
+  <circle cx="120" cy="120" r="116" fill="#35523b"/>
+  <circle cx="120" cy="120" r="108" fill="#f2ead8"/>
+  <g clip-path="url(#badge)">
+    <path d="M12 196 Q60 180 120 188 Q180 196 228 182 L228 240 L12 240 Z" fill="#86a860"/>
+    <path d="M40 194 q3 -10 6 0 M52 191 q3 -10 6 0 M188 188 q3 -10 6 0 M200 186 q3 -10 6 0" stroke="#6c9150" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <!-- rake handle and head -->
+    <rect x="55" y="118" width="8" height="120" rx="4" fill="#a97b4f" transform="rotate(14 59 178)"/>
+    <path d="M38 212 L74 220 L70 240 L34 236 Z" fill="#cf9e56"/>
+    <path d="M44 216 L41 236 M53 218 L51 238 M62 220 L60 240" stroke="#b2823c" stroke-width="3" stroke-linecap="round"/>
+    <!-- torso -->
+    <path d="M74 240 L74 186 Q74 156 104 156 L136 156 Q166 156 166 186 L166 240 Z" fill="#b2603a"/>
+    <path d="M92 162 L92 240 M148 162 L148 240" stroke="#9c4f2e" stroke-width="6"/>
+    <path d="M76 196 L164 196 M76 220 L164 220" stroke="#9c4f2e" stroke-width="5" opacity="0.7"/>
+    <!-- vest -->
+    <path d="M96 158 L96 240 L120 240 L120 176 Q106 172 96 158 Z" fill="#46603f"/>
+    <path d="M144 158 L144 240 L120 240 L120 176 Q134 172 144 158 Z" fill="#46603f"/>
+    <circle cx="120" cy="196" r="3.5" fill="#2f4a33"/>
+    <circle cx="120" cy="216" r="3.5" fill="#2f4a33"/>
+    <rect x="98" y="206" width="16" height="14" rx="3" fill="#3a5234"/>
+    <rect x="126" y="206" width="16" height="14" rx="3" fill="#3a5234"/>
+    <!-- hand on the rake -->
+    <circle cx="74" cy="176" r="11" fill="#eab98f"/>
+    <!-- head -->
+    <circle cx="84" cy="108" r="8" fill="#eab98f"/>
+    <circle cx="156" cy="108" r="8" fill="#eab98f"/>
+    <ellipse cx="120" cy="104" rx="36" ry="34" fill="#eab98f"/>
+    <!-- beard -->
+    <path d="M84 102 Q82 152 104 160 Q120 168 136 160 Q158 152 156 102 Q150 132 120 132 Q90 132 84 102 Z" fill="#ddd6c8"/>
+    <path d="M104 124 Q112 132 120 132 Q128 132 136 124 Q132 142 120 142 Q108 142 104 124 Z" fill="#efe8da"/>
+    <!-- mouth -->
+    <path d="M112 133 Q120 139 128 133" stroke="#7a5c46" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <!-- cheeks and nose -->
+    <ellipse cx="99" cy="114" rx="7" ry="5" fill="#e89f74" opacity="0.55"/>
+    <ellipse cx="141" cy="114" rx="7" ry="5" fill="#e89f74" opacity="0.55"/>
+    <ellipse cx="120" cy="114" rx="10" ry="8" fill="#e0a274"/>
+    <!-- eyes -->
+    <path d="M96 99 q7 -8 14 0" stroke="#3a2e26" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <path d="M130 99 q7 -8 14 0" stroke="#3a2e26" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <path d="M94 86 q8 -6 16 -2" stroke="#cfc9bb" stroke-width="5" fill="none" stroke-linecap="round"/>
+    <path d="M130 84 q8 -4 16 2" stroke="#cfc9bb" stroke-width="5" fill="none" stroke-linecap="round"/>
+    <!-- flat cap -->
+    <path d="M84 82 Q86 48 120 48 Q154 48 156 82 Q120 72 84 82 Z" fill="#5c6d40"/>
+    <path d="M84 82 Q120 71 156 82 L156 87 Q120 77 84 87 Z" fill="#49572f"/>
+    <rect x="74" y="80" width="60" height="9" rx="4.5" fill="#49572f" transform="rotate(-4 104 84)"/>
+    <circle cx="120" cy="52" r="4" fill="#49572f"/>
+    <!-- robin on the shoulder -->
+    <g transform="translate(2 7)">
+      <ellipse cx="170" cy="148" rx="11" ry="9" fill="#8b7d6f"/>
+      <circle cx="177" cy="142" r="6.5" fill="#8b7d6f"/>
+      <path d="M162 150 Q166 156 172 156 Q166 152 164 146 Z" fill="#6f6357"/>
+      <ellipse cx="168" cy="152" rx="7" ry="5" fill="#cf6b4a"/>
+      <circle cx="179" cy="141" r="1.6" fill="#2c2622"/>
+      <path d="M183 143 L189 145 L183 147 Z" fill="#e2b23c"/>
+    </g>
+  </g>
+</svg>
