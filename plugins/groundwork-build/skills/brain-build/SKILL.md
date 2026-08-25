@@ -36,7 +36,7 @@ The mechanical work is a Python package. Find it in this order and stop at the
 first hit:
 
 - `$AIBRAIN_HOME`
-- `~/dev/GroundWorkAI/AiBrainFramework/installer`
+- `~/dev/business/GroundWorkAI/AiBrainFramework/installer`
 
 Run every command from that folder as:
 
@@ -91,12 +91,27 @@ conversation sets the quality of the brain.
 - `never_do`: anything it must never do or say
 - `claude_plan`: `pro` or `max`
 
+**How their knowledge is shaped**
+- `page_kinds`: the kinds of thing this business's knowledge divides into, one
+  per line as `name: what belongs on it` (a list). Ask it as "if I made one
+  page per thing, what are the things?" For a trainer that is course, client,
+  trainer, policy; for a plumber, job, customer, supplier, certification. This
+  becomes the brain's own `type` enum, and without it every page is filed
+  `concept` and nothing can be found by kind.
+- `invented_names`: any names that appear in their documents but are not real
+  (a list). Practice files, worked examples, demo data, training exercises.
+  Whatever is named here is never written up as fact. Ask directly: "is there
+  anything in these files that looks like a customer or a job but was made up
+  for training or a template?" Getting this wrong puts invented people and
+  invented invoices into their brain as record.
+
 **Where to find them**
 - `website`
 - `socials`: a list of full links
 
-Write the answers to a JSON file with exactly those keys (`use_cases` and
-`socials` as arrays, everything else a string). Read it back to the owner in
+Write the answers to a JSON file with exactly those keys (`use_cases`,
+`socials`, `page_kinds` and `invented_names` as arrays, everything else a
+string). Read it back to the owner in
 plain sentences and let them correct it before you go on.
 
 `never_do` becomes a section of their safety constitution and `tone_pref`
@@ -254,7 +269,7 @@ step, and stay with them while they do it:
   wrong there and then.
 - Install the brain skills plugin, `groundwork-brain`. That is the one they
   keep: eight skills for running a brain day to day.
-- Create the three scheduled tasks from `exports/scheduled-tasks/`. Do not skip
+- Create the two scheduled tasks from `exports/scheduled-tasks/`. Do not skip
   these: they are what keeps the brain current.
 
 Offer `cloud-copy --brain <folder> --to <synced folder>` if they want a copy on

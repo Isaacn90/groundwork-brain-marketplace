@@ -16,7 +16,7 @@ already finished.
 ## Requires
 
 The Groundwork engine on the machine running the build, found at `$AIBRAIN_HOME`
-or `~/dev/GroundWorkAI/AiBrainFramework/installer`. Without it the skill says so
+or `~/dev/business/GroundWorkAI/AiBrainFramework/installer`. Without it the skill says so
 and stops rather than half-building anything.
 
 ## Install

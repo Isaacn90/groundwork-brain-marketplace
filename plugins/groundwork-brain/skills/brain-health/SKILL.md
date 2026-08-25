@@ -31,7 +31,14 @@ Work through each check and record what you find:
 
 1. **Stuck documents.** Files in `_sources/` still marked `wiki_status: pending`
    from more than a week ago, or marked `failed` or `needs-review` at all.
-2. **Orphans.** Pages in `wiki/topics/` that no other page links to.
+2. **Disconnected pages.** Count links **between pages in `wiki/topics/` only**.
+   `wiki/index.md` links to every page, so counting it means this check can
+   never fire and the wiki silently rots into a star with the index at the
+   centre. Report three numbers: pages with no outbound link, pages with no
+   inbound link, and pages with neither. A page with neither is isolated and is
+   the real problem. If more than about one page in ten is isolated, say so as
+   a finding in its own right: it means pages are being written without being
+   connected to the courses, clients, platforms and techniques they name.
 3. **Broken links.** Relative markdown links pointing at files that do not exist.
 4. **Missing frontmatter.** Pages with no `type` field, or with a `description`
    that is empty or is just the top of the page body copied out. Descriptions

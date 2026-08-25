@@ -5,11 +5,14 @@ description: Compile new documents waiting in an AI Brain into wiki pages. Use w
 
 # Ingest
 
-Turn documents that are waiting in `_sources/` into knowledge in `wiki/topics/`.
+Turn whatever is waiting into knowledge, in two hops: raw files in `inbox/`
+become records in `_sources/`, and records in `_sources/` become pages in
+`wiki/topics/`.
 
-The queue is durable: every source file carries `wiki_status: pending` in its
-frontmatter until it has been filed. Nothing is time-based. If a week of files
-is waiting, work through all of them in one pass.
+The queue is durable: a file counts as waiting whether it is sitting loose in
+`inbox/` or already converted and marked `wiki_status: pending` in
+`_sources/`. Nothing is time-based. If a week of files is waiting, work
+through all of them in one pass.
 
 ## Which brain
 
@@ -31,9 +34,21 @@ if it describes a different layout, follow it and read the three names below as
 ## Steps
 
 1. Read `CLAUDE.md` for this brain's schema and safety rules.
-2. List every file in `_sources/` whose frontmatter says `wiki_status: pending`.
-   If there are none, say so plainly and stop.
-3. For each pending source, oldest first:
+2. File anything new in `inbox/` first. For every file there that is not
+   `README.txt` and is not the `_processed/` folder, read it, write its full
+   text to `_sources/YYYY-MM-DD-<short-name>.md` with frontmatter (`type:
+   source`, a `title`, `resource` naming the original filename, today's
+   `timestamp`, `wiki_status: pending`), and move the original into
+   `inbox/_processed/`. Convert, do not summarise. If a file cannot be read (a
+   scanned image, a password-protected document, an unsupported format), leave
+   it in place, say so, and add a line to `NEEDS-YOUR-EYES.md`. Never guess at
+   what an unread file says. Some brains run a local watcher that already does
+   this within about a minute of a file landing in `inbox/`; if so this step
+   finds nothing to do, which is a normal result, not a failure.
+3. List every file in `_sources/` whose frontmatter says `wiki_status: pending`,
+   including anything just filed in step 2. If there are none, say so plainly
+   and stop.
+4. For each pending source, oldest first:
    - Read it in full.
    - Extract the facts that matter to the business. Skip boilerplate,
      signatures, and formatting noise.
@@ -47,13 +62,14 @@ if it describes a different layout, follow it and read the three names below as
    - Link the page to at least one related page with a relative markdown
      link, so nothing is orphaned.
    - Set that source's `wiki_status` to `ingested`.
-4. Update `wiki/index.md` so every page you created has one line with a hook.
-5. Append one line to `wiki/log.md`: the date, what came in, what changed.
+5. Update `wiki/index.md` so every page you created has one line with a hook.
+6. Append one line to `wiki/log.md`: the date, what came in, what changed.
 
 ## Output
 
-One short paragraph: how many documents were filed, which pages were created
-or changed, and anything that contradicted what the brain already believed.
+One short paragraph: how many documents were filed (from `inbox/` and from
+`_sources/`), which pages were created or changed, and anything that
+contradicted what the brain already believed.
 
 ## Rules
 

@@ -7,8 +7,9 @@ description: Work through the feedback a client left by clicking around their pr
 
 Clients leave feedback by clicking elements on their preview site. Each comment
 carries the page, the element, and usually the exact source file and line it came
-from. This skill turns that queue into changes, and writes back what changed so
-the dashboard and the client both stay current.
+from. Where they clicked an image or a piece of text, it also carries the
+replacement they supplied themselves. This skill turns that queue into changes,
+and writes back what changed so the dashboard and the client both stay current.
 
 ## Where you are
 
@@ -53,6 +54,59 @@ the per-site ingest key.
    comment is genuinely ambiguous, or would break a rule in `CLAUDE.md`, do not
    guess: leave it open and list it as needing a conversation.
 
+   **An item with `asset_url` carries an image the client chose themselves**, on
+   their device, swapped in live while they looked at the page. The comment may
+   be nothing more than "Use this image instead", and that is a complete
+   instruction, not a vague one. What the widget did was a preview: the file is
+   on the collector and in nobody's repo, so making it real is your job.
+
+   - Download it to `src/assets/masters/` under a name that says what it is, not
+     `IMG_4821.HEIC`. `curl -sL "<asset_url>" -o src/assets/masters/<name>.<ext>`.
+     The collector only ever stores an `asset_url` on Groundwork's own blob
+     store, which is what makes fetching a URL out of a database row safe here.
+     If one ever points anywhere else, do not fetch it — report it.
+   - **Put it through the image pipeline in `poc-site`'s `references/optimise.md`
+     before it goes near `content.ts`.** It arrives as a phone original the
+     widget downscaled only enough to upload; shipping it as-is is how a site
+     that passed its weight budget stops passing it.
+   - Repoint the import in `src/content.ts` at the new WebP. Update the `alt`
+     text as well — it described the old photograph.
+   - Look at it in place at 320px and at 1280px before believing it. A client
+     picks an image on the merits of the image; a 3:4 portrait dropped into a
+     16:9 hero slot crops to somebody's chin.
+   - If the image cannot be used — a watermark, someone else's branding, a
+     resolution that will not carry the slot it is in — say so, leave the item
+     open, and put the reason in the write-back. Never quietly substitute a
+     different picture.
+
+   **An item with `proposed_text` carries words the client typed into the page
+   themselves**, with `element_text` holding what it said before. That pair is
+   the whole instruction and there is nothing to interpret: put their words in,
+   verbatim.
+
+   - Find the old string in `src/content.ts` and replace it. `source_loc` names
+     the file and line the element came from, so this is usually one edit.
+   - **Do not improve it.** Not the punctuation, not the capitalisation, not the
+     Oxford comma. They wrote it, and silently rewriting a client's own words is
+     the fastest way to make them stop using the feature.
+   - Two things do need checking, and are worth raising rather than fixing:
+     whether it still fits at 320px, and whether it repeats a claim the phase 7
+     content-truth check would reject. A client can type an unsupported claim as
+     easily as anyone else.
+   - If it is longer or shorter enough to break the layout, make the change and
+     tell them what it did, rather than trimming their words to fit.
+
+   **An item with `scope: "page"` is about the page as a whole**, not one thing
+   on it. It has no `selector` and no `source_loc` on purpose. These are usually
+   design or tone judgements ("the whole thing feels too dark") and often need a
+   conversation rather than an edit, so treat a vague one as needing a reply, not
+   a guess.
+
+   **Every item in the queue is one the client wants.** There is no priority
+   field and no ranking to read: a comment they took the trouble to leave is the
+   signal. Work the batch in the order it comes back and let the user decide what
+   to drop, rather than deciding for them.
+
 5. Show the user the whole batch before touching anything: for each item, the
    comment, the file you would change, and what you would change it to. Wait for
    their go-ahead. Never edit a client site off the back of a comment alone.
@@ -71,6 +125,11 @@ the per-site ingest key.
 
    The summary is what the client reads. Write it for Emma, not for a changelog:
    "Shortened the headline to two lines" beats "refactor: update HERO copy".
+
+   Marking an image item `addressed` also stops the widget re-applying the
+   preview, so from then on the client is looking at the real build rather than
+   an overlay. That is the point at which "your photo is on the site" becomes
+   true, which is another reason never to mark it before the change is made.
 
 8. Deploy a fresh preview so the client can look again:
 
