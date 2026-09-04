@@ -48,10 +48,15 @@ always safe. Open only the paths it prints, not the whole corpus. If
 2. Read `CLAUDE.md`. It is the schema and the safety rules for this brain.
 3. Read only the most recent entries at the end of `wiki/log.md`, not the
    whole file, to see what changed lately.
-4. Count the pages in `wiki/topics/` to gauge scope.
-5. Count the files in `_sources/` whose frontmatter says `wiki_status: pending`.
+4. Read `hot.md` at the brain root if it exists. If its last-updated date is
+   not older than the newest file in `wiki/topics/`, take the page count, the
+   pending-document count, and the needs-your-eyes status straight from it and
+   skip steps 5-7.
+5. Otherwise (`hot.md` missing, or stale against `wiki/topics/`), count the
+   pages in `wiki/topics/` to gauge scope.
+6. Count the files in `_sources/` whose frontmatter says `wiki_status: pending`.
    These are documents waiting to be filed.
-6. Check whether `NEEDS-YOUR-EYES.md` exists at the root. If it does, read it.
+7. Check whether `NEEDS-YOUR-EYES.md` exists at the root. If it does, read it.
 
 ## Output
 
