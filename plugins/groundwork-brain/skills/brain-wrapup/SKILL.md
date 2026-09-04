@@ -44,10 +44,18 @@ if it describes a different layout, follow it and read the three names below as
    supersedes the old one.
 4. Append one line to `wiki/log.md`: the date and what changed, in plain
    language the owner would understand a year from now.
-5. If something about the business changed in a way that affects every future
+5. If you filed anything durable, update `hot.md` at the brain root: rewrite
+   the last-updated date, the page counts (topic pages, sources), and the
+   one-line status (`Nothing needs you.` or `N things need your eyes. See
+   NEEDS-YOUR-EYES.md`), then append one dated line to `## This week`, for
+   example `2026-09-04: Wrap-up: added pricing note.` Drop any `This week`
+   line older than 7 days. If `hot.md` does not exist, create it with a title,
+   `Last updated:` date, the status line, the page counts, and `## This week`.
+   If nothing durable came up, leave `hot.md` untouched.
+6. If something about the business changed in a way that affects every future
    session, for example the tone of voice, a hard rule, or what the business
    sells, update `CLAUDE.md` itself as well.
-6. If the session surfaced something you could not resolve, add it to
+7. If the session surfaced something you could not resolve, add it to
    `NEEDS-YOUR-EYES.md` at the brain root as a one-line question for the owner.
 
 ## Output

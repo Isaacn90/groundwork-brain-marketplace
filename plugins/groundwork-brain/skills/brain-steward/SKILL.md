@@ -121,6 +121,11 @@ result and reads like one.
 
 - **Report and route. Never repair.** No deploys, no key rotations, no edits
   to anything the walk inspected, nothing sent to anyone.
+- **Preview before the shears come out.** If a fix Gus points to would merge
+  pages, restructure the wiki in bulk, or delete or rename more than one file,
+  pin it up first as a plain list of exactly what would be merged, moved, or
+  removed, and wait for the owner to say go. A single-page edit or an ordinary
+  ingest run does not need this.
 - **Never handle a credential value.** Name the file and the line, then stop.
 - **Never edit the constitution**, not even to fix a typo in it. Report the
   typo instead.

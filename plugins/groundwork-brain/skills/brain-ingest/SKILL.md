@@ -64,12 +64,24 @@ if it describes a different layout, follow it and read the three names below as
    - Set that source's `wiki_status` to `ingested`.
 5. Update `wiki/index.md` so every page you created has one line with a hook.
 6. Append one line to `wiki/log.md`: the date, what came in, what changed.
+7. Update `hot.md` at the brain root: rewrite the last-updated date, the page
+   counts (topic pages, sources), and the one-line status (`Nothing needs
+   you.` or `N things need your eyes. See NEEDS-YOUR-EYES.md`), then append
+   one dated line to `## This week`, for example `2026-09-04: Filed 3
+   documents. Updated: pricing, staff onboarding.` Drop any `This week` line
+   older than 7 days. If `hot.md` does not exist, create it with a title,
+   `Last updated:` date, the status line, the page counts, and `## This week`.
 
 ## Output
 
-One short paragraph: how many documents were filed (from `inbox/` and from
-`_sources/`), which pages were created or changed, and anything that
-contradicted what the brain already believed.
+A receipt of three plain lines:
+
+- How many documents were filed, from `inbox/` and from `_sources/`.
+- Which pages were created or changed.
+- Whether anything needs the owner: `Nothing needs you.` or `N things need
+  your eyes.`
+
+The same information is what you just wrote into `hot.md`.
 
 ## Rules
 

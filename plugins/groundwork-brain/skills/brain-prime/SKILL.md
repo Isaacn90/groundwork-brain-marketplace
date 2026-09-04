@@ -29,6 +29,18 @@ the root with a differently named catalog and log. `CLAUDE.md` is the authority:
 if it describes a different layout, follow it and read the three names below as
 "the topic pages", "the catalog", and "the log".
 
+## Finding pages
+
+Below about 300 pages under `wiki/topics/`, grep is fine and nothing else is
+needed. Past that, grepping every page to prime or search blows the context
+budget. Use the BM25 index instead:
+
+    python3 <skill-dir>/scripts/search.py query <brain-root> "<terms>"
+
+It rebuilds automatically if missing or stale, so calling `query` alone is
+always safe. Open only the paths it prints, not the whole corpus. If
+`python3` is unavailable, fall back to grep silently, no error, no mention.
+
 ## Steps
 
 1. Resolve the brain root as above and confirm `CLAUDE.md` sits beside
@@ -56,3 +68,6 @@ Four short lines, no preamble:
 - Never read `wiki/index.md` or `wiki/log.md` from top to bottom.
 - If a file you expect is missing, say which one and what it means. Never
   report a clean start when you could not check.
+- When you answer a question from a page in the brain, name the page and when
+  it was last updated, in plain words: "From your pricing page, last updated
+  12 Aug." Only when the answer actually came from a page.
