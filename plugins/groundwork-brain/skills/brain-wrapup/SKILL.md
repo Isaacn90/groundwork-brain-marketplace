@@ -35,13 +35,23 @@ if it describes a different layout, follow it and read the three names below as
    - A preference about how work should be done.
    - A correction to something the brain believed.
    - A fact the user stated that is not yet written down anywhere.
+   - A conclusion this session reached the long way: research, an analysis, a
+     review, a comparison. The work of reaching it is what makes it durable,
+     because the next session would otherwise pay for it again.
 
-   Ignore anything that was one-off: a draft, a question answered from
-   existing pages, formatting, or chit-chat.
+   Ignore anything that was one-off: a draft, formatting, chit-chat, or a
+   question answered straight off pages that already exist.
 3. For each durable item, file it into the right page in `wiki/topics/`,
    following the schema. Create the page if it does not exist. Where it
    corrects an existing statement, state the current fact and note that it
    supersedes the old one.
+
+   A conclusion from step 2's last bullet gets its own page, `type: finding`,
+   with a `## Related` section linking the pages it drew on. Without those
+   links it is born isolated and the next health check flags it. One page per
+   question: if a `finding` page already answers this one, update it and note
+   what changed rather than starting a second one. Do not use `type: report`,
+   which is for documents the business produced or received.
 4. Append one line to `wiki/log.md`: the date and what changed, in plain
    language the owner would understand a year from now.
 5. If you filed anything durable, update `hot.md` at the brain root: rewrite
