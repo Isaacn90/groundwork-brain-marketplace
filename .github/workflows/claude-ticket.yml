@@ -1,0 +1,170 @@
+# gw-tickets: a ticket labelled `claude` becomes a pull request.
+#
+# - Filing a Feature/Bug ticket (or adding the `claude` label) makes Claude build it
+#   on a branch and open a PR filled from .github/pull_request_template.md.
+# - If the ticket is unclear, Claude asks on the ticket and labels it `needs-info`.
+#   Your next comment on that ticket restarts the build.
+# - `@claude <change>` on the PR makes Claude push a revision to the same PR.
+#
+# Only the repo owner can trigger any of this. Claude never merges: shipping is
+# claude-ship.yml, and only your approval starts it.
+#
+# Needs: the Claude GitHub App installed on this repo, and the secret
+# CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token`). Optional repo variable
+# CLAUDE_MODEL (e.g. `opus`) to override the default model.
+
+name: Claude builds tickets
+
+on:
+  issues:
+    types: [opened, labeled]
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  build:
+    if: >-
+      github.event.sender.login == github.repository_owner && (
+        (github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'claude') ||
+        (github.event_name == 'issues' && github.event.action == 'opened' && contains(github.event.issue.labels.*.name, 'claude')) ||
+        (github.event_name == 'issue_comment' && !github.event.issue.pull_request && contains(github.event.issue.labels.*.name, 'needs-info'))
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    concurrency:
+      group: claude-ticket-${{ github.event.issue.number }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+    steps:
+      - name: Skip if this ticket already has a PR or is waiting on an answer
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          N: ${{ github.event.issue.number }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          open=$(gh pr list -R "$GITHUB_REPOSITORY" --state open --limit 100 --json headRefName \
+            --jq "[.[] | select(.headRefName | startswith(\"claude/issue-$N-\"))] | length")
+          waiting=$(gh issue view "$N" -R "$GITHUB_REPOSITORY" --json labels \
+            --jq '[.labels[].name | select(. == "needs-info")] | length')
+          if [ "$open" -gt 0 ]; then
+            echo "Ticket #$N already has an open PR. Use @claude on the PR for changes."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          elif [ "$EVENT" = "issues" ] && [ "$waiting" -gt 0 ]; then
+            echo "Ticket #$N is waiting on an answer (needs-info). A comment restarts it."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.run == 'true'
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.run == 'true' && hashFiles('package.json') != '' && hashFiles('.nvmrc', '.node-version') == ''
+        with:
+          node-version: 24
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.run == 'true' && hashFiles('.nvmrc', '.node-version') != ''
+        with:
+          node-version-file: ${{ hashFiles('.nvmrc') != '' && '.nvmrc' || '.node-version' }}
+      - uses: actions/setup-python@v5
+        if: steps.gate.outputs.run == 'true' && hashFiles('pyproject.toml', 'requirements*.txt') != ''
+        with:
+          python-version: "3.12"
+
+      - uses: anthropics/claude-code-action@v1
+        if: steps.gate.outputs.run == 'true'
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: |
+            --allowedTools Bash,Read,Edit,MultiEdit,Write,Glob,Grep,WebFetch,TodoWrite
+            --max-turns 150
+            ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
+          prompt: |
+            You are the developer on ${{ github.repository }}. Ticket #${{ github.event.issue.number }} is yours to build.
+            The repo owner will review your pull request and approve it. You never merge.
+
+            1. Read the ticket and every comment on it:
+               `gh issue view ${{ github.event.issue.number }} --comments`
+               Then read CLAUDE.md, README and any docs the repo has, and follow them.
+            2. If the ticket is too unclear to build something the owner would approve, do not guess.
+               Post one comment on the ticket with specific numbered questions, then run
+               `gh issue edit ${{ github.event.issue.number }} --add-label needs-info` and stop.
+               If the label `needs-info` is already on the ticket and the latest comments answer
+               your questions, remove it (`--remove-label needs-info`) and carry on.
+            3. Create a branch from the default branch named
+               `claude/issue-${{ github.event.issue.number }}-<short-kebab-summary>`.
+            4. Build it. Keep the change to what the ticket asks. Match the repo's existing style.
+               Add or update tests where the repo has them.
+            5. Run the repo's own checks: whatever CLAUDE.md, README or package.json/pyproject
+               define (lint, typecheck, test, build, verify). Install what they need, e.g.
+               `npx playwright install --with-deps chromium` for Playwright. Fix failures you caused.
+               Never skip, disable or delete a test to get green.
+            6. Commit with a conventional message ending in `(#${{ github.event.issue.number }})`, push the branch.
+            7. Open the PR with `gh pr create --base <default branch> --body-file <file>`.
+               Title: `feat: …` or `fix: …` plus a plain summary, ending in `(#${{ github.event.issue.number }})`.
+               Body: copy .github/pull_request_template.md and fill in every section. Keep the HTML
+               comments out. The Ticket section must read `Closes #${{ github.event.issue.number }}`.
+               In "Done when", copy each line from the ticket and mark it met or not met with evidence.
+               In "How it was tested", paste the exact commands and their results.
+               If any check still fails or any "Done when" item is not met, open it with `--draft`
+               and say exactly what is outstanding at the top of the body.
+            8. Comment on ticket #${{ github.event.issue.number }}: one line with the PR link, then
+               "Reply `approve` here or on the PR to ship it."
+
+            Never commit secrets or .env files. Never push to the default branch. Never merge.
+
+  revise:
+    if: >-
+      github.event.sender.login == github.repository_owner && (
+        (github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude'))
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    concurrency:
+      group: claude-revise-${{ github.event.issue.number || github.event.pull_request.number }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        if: hashFiles('package.json') != '' && hashFiles('.nvmrc', '.node-version') == ''
+        with:
+          node-version: 24
+      - uses: actions/setup-node@v4
+        if: hashFiles('.nvmrc', '.node-version') != ''
+        with:
+          node-version-file: ${{ hashFiles('.nvmrc') != '' && '.nvmrc' || '.node-version' }}
+      - uses: actions/setup-python@v5
+        if: hashFiles('pyproject.toml', 'requirements*.txt') != ''
+        with:
+          python-version: "3.12"
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: |
+            --allowedTools Bash,Read,Edit,MultiEdit,Write,Glob,Grep,WebFetch,TodoWrite
+            --max-turns 100
+            --append-system-prompt "Follow CLAUDE.md. Run the repo's checks before pushing and never skip or disable a test. After pushing, update the PR body so every section of the PR template, especially Done when and How it was tested, matches the new state. Never merge."
+            ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
