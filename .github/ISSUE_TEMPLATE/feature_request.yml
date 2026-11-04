@@ -1,14 +1,14 @@
 name: Feature request
-description: Something new or changed. Claude builds it and opens a PR for you to approve.
+description: Something new or changed. Claude refines it with you, builds it and opens a PR for you to approve.
 title: "[Feature] "
 labels: ["feature", "claude"]
 body:
   - type: markdown
     attributes:
       value: |
-        Claude picks this up as soon as it's filed, builds it on a branch and opens a PR.
+        Claude reads this first and replies with a refined spec and any questions. Reply to change it.
+        Reply `go` to build: Claude opens a PR and a fresh reviewer comments on it.
         Reply `approve` on the PR or here when you're happy. It merges and ships.
-        The clearer the "done when" list, the less back and forth.
   - type: textarea
     id: what
     attributes:

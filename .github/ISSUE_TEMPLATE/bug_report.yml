@@ -1,5 +1,5 @@
 name: Bug
-description: Something is broken. Claude finds the cause, fixes it and opens a PR for you to approve.
+description: Something is broken. Claude confirms the cause with you, fixes it and opens a PR for you to approve.
 title: "[Bug] "
 labels: ["bug", "claude"]
 body:

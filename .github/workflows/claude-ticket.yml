@@ -1,17 +1,23 @@
-# gw-tickets: a ticket labelled `claude` becomes a pull request.
+# gw-tickets: a ticket labelled `claude` is refined with you, built, then reviewed.
 #
-# - Filing a Feature/Bug ticket (or adding the `claude` label) makes Claude build it
-#   on a branch and open a PR filled from .github/pull_request_template.md.
-# - If the ticket is unclear, Claude asks on the ticket and labels it `needs-info`.
-#   Your next comment on that ticket restarts the build.
-# - `@claude <change>` on the PR makes Claude push a revision to the same PR.
+# 1. refine  Filing a Feature/Bug ticket (or adding `claude`) makes Claude post a
+#            "Refined spec": goal, checks, the simplest approach and what it will
+#            not build, files, risks, questions. Labels `refined` or `needs-info`.
+#            Any reply on the ticket updates the spec. No code is written.
+# 2. build   Reply `go` on a `refined` ticket. A fresh session builds from the
+#            latest spec, tests first, and opens a PR.
+# 3. review  After every build or revision a fresh session reviews the PR for bugs
+#            (/code-review) and over-engineering (/ponytail-review) and posts one
+#            comment. It never edits.
+# 4. revise  `@claude <change>` on the PR pushes a revision; review runs again.
+# Shipping is claude-ship.yml: `approve` merges and deploys. Claude never merges.
 #
-# Only the repo owner can trigger any of this. Claude never merges: shipping is
-# claude-ship.yml, and only your approval starts it.
+# Only the repo owner can trigger any of this. Ponytail (minimalism plugin) is
+# pinned to PONYTAIL_REF and loaded in every run; each run logs whether it loaded.
 #
-# Needs: the Claude GitHub App installed on this repo, and the secret
-# CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token`). Optional repo variable
-# CLAUDE_MODEL (e.g. `opus`) to override the default model.
+# Needs: the Claude GitHub App on this repo and the secret CLAUDE_CODE_OAUTH_TOKEN
+# (from `claude setup-token`). Optional repo variable CLAUDE_MODEL overrides the
+# build and revise model.
 
 name: Claude builds tickets
 
@@ -25,14 +31,117 @@ on:
   pull_request_review:
     types: [submitted]
 
+env:
+  PONYTAIL_REF: v5.3.3
+
 jobs:
-  build:
+  refine:
     if: >-
-      github.event.sender.login == github.repository_owner && (
+      github.event.sender.login == github.repository_owner && !github.event.issue.pull_request &&
+      github.event.issue.state == 'open' && (
         (github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'claude') ||
         (github.event_name == 'issues' && github.event.action == 'opened' && contains(github.event.issue.labels.*.name, 'claude')) ||
-        (github.event_name == 'issue_comment' && !github.event.issue.pull_request && contains(github.event.issue.labels.*.name, 'needs-info'))
+        (github.event_name == 'issue_comment' && contains(github.event.issue.labels.*.name, 'claude'))
       )
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: claude-refine-${{ github.event.issue.number }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+      id-token: write
+      actions: read
+    steps:
+      - name: Refine now?
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          N: ${{ github.event.issue.number }}
+          EVENT: ${{ github.event_name }}
+          ACTION: ${{ github.event.action }}
+          BODY: ${{ github.event.comment.body }}
+          CREATED: ${{ github.event.issue.created_at }}
+          UPDATED: ${{ github.event.issue.updated_at }}
+        run: |
+          run=true
+          open=$(gh pr list -R "$GITHUB_REPOSITORY" --state open --limit 100 --json headRefName \
+            --jq "[.[] | select(.headRefName | startswith(\"claude/issue-$N-\"))] | length")
+          if [ "$open" -gt 0 ]; then
+            echo "Ticket #$N already has a PR. Use @claude on the PR."; run=false
+          elif [ "$EVENT" = "issue_comment" ]; then
+            norm=$(printf '%s' "$BODY" | tr '[:upper:]' '[:lower:]' | tr -d '\r' \
+              | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/[.!]*$//')
+            case "$norm" in
+              go|/go|build|"build it"|approve|approved|/approve|"ship it"|shipit|/ship|lgtm)
+                echo "A go or ship word, not spec feedback."; run=false ;;
+            esac
+          elif [ "$ACTION" = "labeled" ] && [ $(( $(date -d "$UPDATED" +%s) - $(date -d "$CREATED" +%s) )) -lt 60 ]; then
+            echo "Labelled by the issue form; the opened event refines it."; run=false
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.run == 'true'
+
+      - name: Get ponytail
+        if: steps.gate.outputs.run == 'true'
+        run: git clone -q --depth 1 --branch "$PONYTAIL_REF" https://github.com/DietrichGebert/ponytail.git "$RUNNER_TEMP/ponytail"
+
+      - uses: anthropics/claude-code-action@v1
+        id: claude
+        if: steps.gate.outputs.run == 'true'
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          plugin_marketplaces: ${{ runner.temp }}/ponytail
+          plugins: ponytail@ponytail
+          claude_args: |
+            --model claude-opus-5-5
+            --allowedTools "Read,Glob,Grep,Write,Bash(gh issue:*),Bash(git log:*),Bash(git grep:*),Bash(ls:*)"
+            --max-turns 40
+            --include-hook-events
+          prompt: |
+            You refine ticket #${{ github.event.issue.number }} on ${{ github.repository }} before anyone writes code.
+            You do not write code, create branches or commit. Your output is one comment on the ticket.
+
+            1. Read the ticket and every comment: `gh issue view ${{ github.event.issue.number }} --comments`.
+               Read CLAUDE.md, README and the code the ticket touches.
+            2. Write a spec to /tmp/spec.md and post it with
+               `gh issue comment ${{ github.event.issue.number }} --body-file /tmp/spec.md`. It starts with the line
+               `## Refined spec` and has, in this order:
+               - **Goal:** one sentence.
+               - **Done when:** numbered checks someone can run or see. Keep the ticket's lines, sharpen vague
+                 ones, add the failure cases it forgot.
+               - **Approach:** the simplest change that meets every check. Climb the ponytail ladder: name what
+                 already exists in this repo to reuse, then the smallest new code. Then **Not building:** what a
+                 bigger solution would add that this one leaves out.
+               - **Files:** files you expect to change and the tests you will add.
+               - **Risks:** only real ones. Omit if none.
+               - **Owner steps:** anything under `.github/workflows/` the change needs. The build cannot push
+                 workflow files (the Claude app has no workflows permission), so spell out the exact edit.
+                 Omit if none.
+               - **Questions:** numbered, only where a wrong guess would waste the build. Omit if none.
+               - Last line: "Reply to change anything, or reply `go` to build."
+               If an earlier `## Refined spec` exists, the owner's later comments are answers or changes:
+               post a complete new spec that includes them, not a reply.
+            3. Labels: if you asked questions run
+               `gh issue edit ${{ github.event.issue.number }} --add-label needs-info --remove-label refined`,
+               otherwise `gh issue edit ${{ github.event.issue.number }} --add-label refined --remove-label needs-info`.
+
+            Never commit secrets. Never touch code.
+
+      - name: Ponytail loaded?
+        if: always() && steps.claude.outputs.execution_file != ''
+        run: |
+          grep -q PONYTAIL "${{ steps.claude.outputs.execution_file }}" && echo "ponytail active" || echo "::warning::ponytail did not load in this run"
+
+  build:
+    if: >-
+      github.event_name == 'issue_comment' && github.event.sender.login == github.repository_owner &&
+      !github.event.issue.pull_request && contains(github.event.issue.labels.*.name, 'refined') &&
+      !contains(github.event.issue.labels.*.name, 'needs-info')
     runs-on: ubuntu-latest
     timeout-minutes: 60
     concurrency:
@@ -44,23 +153,26 @@ jobs:
       issues: write
       id-token: write
       actions: read
+    outputs:
+      ran: ${{ steps.gate.outputs.run }}
     steps:
-      - name: Skip if this ticket already has a PR or is waiting on an answer
+      - name: Is this a go?
         id: gate
         env:
           GH_TOKEN: ${{ github.token }}
           N: ${{ github.event.issue.number }}
-          EVENT: ${{ github.event_name }}
+          BODY: ${{ github.event.comment.body }}
         run: |
+          norm=$(printf '%s' "$BODY" | tr '[:upper:]' '[:lower:]' | tr -d '\r' \
+            | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/[.!]*$//')
+          case "$norm" in
+            go|/go|build|"build it") ;;
+            *) echo "Not a go comment."; echo "run=false" >> "$GITHUB_OUTPUT"; exit 0 ;;
+          esac
           open=$(gh pr list -R "$GITHUB_REPOSITORY" --state open --limit 100 --json headRefName \
             --jq "[.[] | select(.headRefName | startswith(\"claude/issue-$N-\"))] | length")
-          waiting=$(gh issue view "$N" -R "$GITHUB_REPOSITORY" --json labels \
-            --jq '[.labels[].name | select(. == "needs-info")] | length')
           if [ "$open" -gt 0 ]; then
             echo "Ticket #$N already has an open PR. Use @claude on the PR for changes."
-            echo "run=false" >> "$GITHUB_OUTPUT"
-          elif [ "$EVENT" = "issues" ] && [ "$waiting" -gt 0 ]; then
-            echo "Ticket #$N is waiting on an answer (needs-info). A comment restarts it."
             echo "run=false" >> "$GITHUB_OUTPUT"
           else
             echo "run=true" >> "$GITHUB_OUTPUT"
@@ -84,47 +196,68 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Get ponytail
+        if: steps.gate.outputs.run == 'true'
+        run: git clone -q --depth 1 --branch "$PONYTAIL_REF" https://github.com/DietrichGebert/ponytail.git "$RUNNER_TEMP/ponytail"
+
       - uses: anthropics/claude-code-action@v1
+        id: claude
         if: steps.gate.outputs.run == 'true'
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          plugin_marketplaces: ${{ runner.temp }}/ponytail
+          plugins: ponytail@ponytail
           claude_args: |
+            --model ${{ vars.CLAUDE_MODEL || 'claude-sonnet-5-5' }}
             --allowedTools Bash,Read,Edit,MultiEdit,Write,Glob,Grep,WebFetch,TodoWrite
             --max-turns 150
-            ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
+            --include-hook-events
           prompt: |
             You are the developer on ${{ github.repository }}. Ticket #${{ github.event.issue.number }} is yours to build.
             The repo owner will review your pull request and approve it. You never merge.
 
-            1. Read the ticket and every comment on it:
+            1. Read the ticket and every comment:
                `gh issue view ${{ github.event.issue.number }} --comments`
-               Then read CLAUDE.md, README and any docs the repo has, and follow them.
-            2. If the ticket is too unclear to build something the owner would approve, do not guess.
-               Post one comment on the ticket with specific numbered questions, then run
-               `gh issue edit ${{ github.event.issue.number }} --add-label needs-info` and stop.
-               If the label `needs-info` is already on the ticket and the latest comments answer
-               your questions, remove it (`--remove-label needs-info`) and carry on.
+               The latest comment that starts with `## Refined spec` is the agreed spec. Anything the owner
+               wrote after it overrides it. Build what it says, using its Approach, and nothing from its
+               "Not building" list. Then read CLAUDE.md, README and any docs the repo has, and follow them.
+            2. If something blocks building that the spec did not settle, do not guess. Post one comment with
+               numbered questions, run `gh issue edit ${{ github.event.issue.number }} --add-label needs-info`
+               and stop.
             3. Create a branch from the default branch named
                `claude/issue-${{ github.event.issue.number }}-<short-kebab-summary>`.
-            4. Build it. Keep the change to what the ticket asks. Match the repo's existing style.
-               Add or update tests where the repo has them.
-            5. Run the repo's own checks: whatever CLAUDE.md, README or package.json/pyproject
-               define (lint, typecheck, test, build, verify). Install what they need, e.g.
+            4. Tests first. For any logic change, write the failing test, run it and see it fail, then make
+               it pass. Do not edit or delete an existing test to get green. If one genuinely has to change,
+               say which and why in the PR under Risks.
+            5. Build it. Keep the change to the spec. Match the repo's existing style.
+            6. Run the repo's own checks: whatever CLAUDE.md, README or package.json/pyproject define (lint,
+               typecheck, test, build, verify). Install what they need, e.g.
                `npx playwright install --with-deps chromium` for Playwright. Fix failures you caused.
-               Never skip, disable or delete a test to get green.
-            6. Commit with a conventional message ending in `(#${{ github.event.issue.number }})`, push the branch.
-            7. Open the PR with `gh pr create --base <default branch> --body-file <file>`.
+               Never skip or disable a test.
+            7. You cannot push changes under `.github/workflows/` (the Claude app has no workflows
+               permission). Leave those files alone and put the exact edit under Deploy notes as an owner step;
+               it does not make the PR a draft.
+            8. If this ticket taught something the next ticket on this repo needs (a command, a trap, a rule),
+               add one line to CLAUDE.md in this change.
+            9. Commit with a conventional message ending in `(#${{ github.event.issue.number }})`, push the branch.
+            10. Open the PR with `gh pr create --base <default branch> --body-file <file>`.
                Title: `feat: …` or `fix: …` plus a plain summary, ending in `(#${{ github.event.issue.number }})`.
                Body: copy .github/pull_request_template.md and fill in every section. Keep the HTML
                comments out. The Ticket section must read `Closes #${{ github.event.issue.number }}`.
-               In "Done when", copy each line from the ticket and mark it met or not met with evidence.
-               In "How it was tested", paste the exact commands and their results.
+               In "Done when", copy each check from the spec and mark it met or not met with evidence.
+               In "How it was tested", paste the exact commands and their results, including the test
+               you saw fail first.
                If any check still fails or any "Done when" item is not met, open it with `--draft`
                and say exactly what is outstanding at the top of the body.
-            8. Comment on ticket #${{ github.event.issue.number }}: one line with the PR link, then
-               "Reply `approve` here or on the PR to ship it."
+            11. Comment on ticket #${{ github.event.issue.number }}: one line with the PR link, then
+                "A review follows on the PR. Reply `approve` here or on the PR to ship it."
 
             Never commit secrets or .env files. Never push to the default branch. Never merge.
+
+      - name: Ponytail loaded?
+        if: always() && steps.claude.outputs.execution_file != ''
+        run: |
+          grep -q PONYTAIL "${{ steps.claude.outputs.execution_file }}" && echo "ponytail active" || echo "::warning::ponytail did not load in this run"
 
   revise:
     if: >-
@@ -160,11 +293,99 @@ jobs:
         if: hashFiles('pyproject.toml', 'requirements*.txt') != ''
         with:
           python-version: "3.12"
+      - name: Get ponytail
+        run: git clone -q --depth 1 --branch "$PONYTAIL_REF" https://github.com/DietrichGebert/ponytail.git "$RUNNER_TEMP/ponytail"
       - uses: anthropics/claude-code-action@v1
+        id: claude
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          plugin_marketplaces: ${{ runner.temp }}/ponytail
+          plugins: ponytail@ponytail
           claude_args: |
             --allowedTools Bash,Read,Edit,MultiEdit,Write,Glob,Grep,WebFetch,TodoWrite
             --max-turns 100
-            --append-system-prompt "Follow CLAUDE.md. Run the repo's checks before pushing and never skip or disable a test. After pushing, update the PR body so every section of the PR template, especially Done when and How it was tested, matches the new state. Never merge."
-            ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
+            --include-hook-events
+            --append-system-prompt "Follow CLAUDE.md. Write a failing test first for any logic change. Run the repo's checks before pushing; never skip, disable, edit or delete an existing test to get green. After pushing, update the PR body so every section of the PR template, especially Done when and How it was tested, matches the new state. You cannot push files under .github/workflows; put such edits in the PR body as an owner step. Never merge."
+            --model ${{ vars.CLAUDE_MODEL || 'claude-sonnet-5-5' }}
+      - name: Ponytail loaded?
+        if: always() && steps.claude.outputs.execution_file != ''
+        run: |
+          grep -q PONYTAIL "${{ steps.claude.outputs.execution_file }}" && echo "ponytail active" || echo "::warning::ponytail did not load in this run"
+
+  review:
+    needs: [build, revise]
+    if: >-
+      always() && (
+        (needs.build.result == 'success' && needs.build.outputs.ran == 'true') ||
+        needs.revise.result == 'success'
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+      id-token: write
+      actions: read
+    steps:
+      - name: Find the PR
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          N: ${{ github.event.issue.number || github.event.pull_request.number }}
+          IS_PR: ${{ github.event.issue.pull_request != null || github.event.pull_request != null }}
+        run: |
+          if [ "$IS_PR" = "true" ]; then pr=$N; else
+            pr=$(gh pr list -R "$GITHUB_REPOSITORY" --state open --limit 100 --json number,headRefName \
+              --jq "[.[] | select(.headRefName | startswith(\"claude/issue-$N-\"))][0].number // empty")
+          fi
+          [ -n "$pr" ] || { echo "No open PR (the build may have stopped on a question)."; }
+          echo "number=$pr" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        if: steps.pr.outputs.number != ''
+        with:
+          fetch-depth: 0
+
+      - name: Get ponytail
+        if: steps.pr.outputs.number != ''
+        run: git clone -q --depth 1 --branch "$PONYTAIL_REF" https://github.com/DietrichGebert/ponytail.git "$RUNNER_TEMP/ponytail"
+
+      - uses: anthropics/claude-code-action@v1
+        id: claude
+        if: steps.pr.outputs.number != ''
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          plugin_marketplaces: |
+            ${{ runner.temp }}/ponytail
+            https://github.com/anthropics/claude-plugins-official.git
+          plugins: |
+            ponytail@ponytail
+            code-review@claude-plugins-official
+          claude_args: |
+            --model claude-opus-5-5
+            --allowedTools "Read,Glob,Grep,Write,Skill,Agent,Task,Bash(gh pr:*),Bash(gh api:*),Bash(gh issue view:*),Bash(git log:*),Bash(git diff:*),Bash(git blame:*),Bash(git show:*)"
+            --max-turns 60
+            --include-hook-events
+          prompt: |
+            You review pull request #${{ steps.pr.outputs.number }} on ${{ github.repository }} with fresh eyes.
+            You did not write it. You only comment: never edit code, commit or push.
+
+            1. Run the /code-review command on PR #${{ steps.pr.outputs.number }} without --comment, and keep
+               its findings (bugs, CLAUDE.md breaches).
+            2. Run /ponytail-review on the PR's diff (`gh pr diff ${{ steps.pr.outputs.number }}`): what could be
+               deleted, reused or made simpler without losing validation, error handling or security.
+            3. Tests: list any existing test file the PR edits or deletes (compare `gh pr diff --name-only`
+               with files that exist on the base branch), and any new logic that has no test.
+            4. Write one comment to /tmp/review.md and post it with
+               `gh pr comment ${{ steps.pr.outputs.number }} --body-file /tmp/review.md`. Start it with
+               `## Review`, then three short sections: **Correctness**, **Simpler**, **Tests**. Each finding is
+               `file:line`, what is wrong, why it matters. Write "Nothing found." for an empty section.
+               End with one line: `Ready to approve.` or `Fix first: <the single most important item>`.
+
+            Report only what you would defend. No style nits.
+
+      - name: Ponytail loaded?
+        if: always() && steps.claude.outputs.execution_file != ''
+        run: |
+          grep -q PONYTAIL "${{ steps.claude.outputs.execution_file }}" && echo "ponytail active" || echo "::warning::ponytail did not load in this run"

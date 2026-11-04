@@ -25,5 +25,6 @@ jobs:
           gh label create claude     --force --color 7C3AED --description "Claude builds this ticket"
           gh label create feature    --force --color 0E8A16 --description "New or changed behaviour"
           gh label create bug        --force --color D73A4A --description "Something is broken"
-          gh label create needs-info --force --color FBCA04 --description "Claude asked a question; your reply restarts the build"
+          gh label create refined    --force --color 5319E7 --description "Spec posted; reply to change it, or go to build"
+          gh label create needs-info --force --color FBCA04 --description "Claude asked questions; your reply updates the spec"
           gh label create shipped    --force --color 1D76DB --description "Merged and deployed"
