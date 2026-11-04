@@ -1,0 +1,226 @@
+# gw-tickets: the owner's approval merges the PR and ships it.
+#
+# Approve by any of:
+#   - a comment that is just `approve` (also: approved, /approve, ship it, lgtm)
+#     on the PR or on its ticket
+#   - GitHub's own review screen: Review changes > Approve
+#
+# Then this workflow:
+#   1. finds the PR (on a ticket: the open PR whose branch is claude/issue-<n>-*)
+#   2. waits for its checks and refuses to merge if any fail
+#   3. squash-merges exactly the commit that was checked, deletes the branch
+#   4. runs the repo's deploy workflow(s) on the default branch and waits for them:
+#      DEPLOY_WORKFLOW (space-separated list) if set, else .github/workflows/deploy.yml or
+#      deploy.yaml if it exists and has `workflow_dispatch`. A merge made by this
+#      workflow does not fire `push` workflows (GitHub blocks that for
+#      GITHUB_TOKEN), so this dispatch is what deploys. Repos deployed by Vercel/
+#      Netlify/Cloudflare git integration deploy on the merge itself.
+#   5. reports back on the PR and the ticket, and closes the ticket.
+#
+# Only the repo owner's approval counts. This file runs from the default branch,
+# so a PR cannot change the rules it is judged by.
+
+name: Ship on approval
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+
+concurrency:
+  group: claude-ship-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  ship:
+    if: >-
+      github.event.sender.login == github.repository_owner && (
+        (github.event_name == 'issue_comment' && (contains(github.event.comment.body, 'approve') ||
+          contains(github.event.comment.body, 'ship') || contains(github.event.comment.body, 'lgtm'))) ||
+        (github.event_name == 'pull_request_review' && github.event.review.state == 'approved')
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      checks: read
+      statuses: read
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      EVENT: ${{ github.event_name }}
+      BODY: ${{ github.event.comment.body }}
+      NUM: ${{ github.event.issue.number || github.event.pull_request.number }}
+      IS_PR: ${{ github.event_name == 'pull_request_review' || github.event.issue.pull_request != null }}
+      DEPLOY_WORKFLOW: ${{ vars.DEPLOY_WORKFLOW }}
+    steps:
+      - name: Is this an approval?
+        id: intent
+        run: |
+          if [ "$EVENT" = "pull_request_review" ]; then
+            echo "approved=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          # The whole comment must be the approval word, so "don't approve yet" never ships.
+          norm=$(printf '%s' "$BODY" | tr '[:upper:]' '[:lower:]' | tr -d '\r' \
+            | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/[.!]*$//')
+          case "$norm" in
+            approve|approved|/approve|"ship it"|shipit|/ship|lgtm) echo "approved=true" >> "$GITHUB_OUTPUT" ;;
+            *) echo "Not an approval comment, nothing to do."; echo "approved=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Find the PR
+        id: pr
+        if: steps.intent.outputs.approved == 'true'
+        run: |
+          if [ "$IS_PR" = "true" ]; then
+            pr="$NUM"
+            ticket=$(gh pr view "$pr" --json closingIssuesReferences --jq '.closingIssuesReferences[0].number // empty')
+          else
+            ticket="$NUM"
+            prs=$(gh pr list --state open --limit 100 --json number,headRefName \
+              --jq "[.[] | select(.headRefName | startswith(\"claude/issue-$NUM-\")) | .number]")
+            count=$(echo "$prs" | jq length)
+            if [ "$count" -eq 0 ]; then
+              gh issue comment "$NUM" --body "Nothing to ship yet: no open PR for this ticket. Claude opens one once the build finishes."
+              exit 1
+            elif [ "$count" -gt 1 ]; then
+              gh issue comment "$NUM" --body "More than one open PR for this ticket ($(echo "$prs" | jq -r 'map("#"+tostring) | join(", ")')). Approve the one you want on the PR itself."
+              exit 1
+            fi
+            pr=$(echo "$prs" | jq -r '.[0]')
+          fi
+          state=$(gh pr view "$pr" --json state,isCrossRepository --jq '.state + " " + (.isCrossRepository|tostring)')
+          if [ "$state" != "OPEN false" ]; then
+            gh pr comment "$pr" --body "Not shipping: PR is not an open PR from this repo ($state)."
+            exit 1
+          fi
+          echo "pr=$pr" >> "$GITHUB_OUTPUT"
+          echo "ticket=$ticket" >> "$GITHUB_OUTPUT"
+          echo "sha=$(gh pr view "$pr" --json headRefOid --jq .headRefOid)" >> "$GITHUB_OUTPUT"
+          echo "Shipping PR #$pr (ticket: ${ticket:-none})"
+
+      - name: Mark ready and wait for checks
+        if: steps.intent.outputs.approved == 'true'
+        env:
+          PR: ${{ steps.pr.outputs.pr }}
+        run: |
+          gh pr comment "$PR" --body "Approved. Waiting on checks, then merging."
+          if [ "$(gh pr view "$PR" --json isDraft --jq .isDraft)" = "true" ]; then
+            gh pr ready "$PR"
+          fi
+          # Poll the PR's checks, ignoring the ticket workflows themselves: an approval
+          # from the review screen runs this job against the PR's own commit, and
+          # waiting on it would wait on ourselves.
+          sleep 20
+          filter='[.statusCheckRollup[] | select((.workflowName // "") as $w
+            | ($w != "Ship on approval" and $w != "Claude builds tickets" and $w != "Ticket labels"))]'
+          for _ in $(seq 1 120); do
+            checks=$(gh pr view "$PR" --json statusCheckRollup --jq "$filter")
+            total=$(echo "$checks" | jq length)
+            if [ "$total" -eq 0 ]; then
+              echo "::warning::PR #$PR has no checks. Merging on approval alone."
+              exit 0
+            fi
+            failed=$(echo "$checks" | jq '[.[] | select(
+              (.conclusion // "" | test("FAILURE|TIMED_OUT|CANCELLED|ACTION_REQUIRED|STARTUP_FAILURE")) or
+              (.state // "" | test("FAILURE|ERROR")))] | length')
+            pending=$(echo "$checks" | jq '[.[] | select(
+              (.status != null and .status != "COMPLETED") or
+              (.state // "" | test("PENDING|EXPECTED")))] | length')
+            echo "checks: $total total, $pending pending, $failed failed"
+            if [ "$failed" -gt 0 ]; then
+              gh pr comment "$PR" --body "Not merged: a check failed. Comment \`@claude fix the failing checks\` or look at the Checks tab, then approve again."
+              exit 1
+            fi
+            [ "$pending" -eq 0 ] && exit 0
+            sleep 20
+          done
+          gh pr comment "$PR" --body "Not merged: checks were still running after 40 minutes. Approve again once they finish."
+          exit 1
+
+      - name: Merge
+        if: steps.intent.outputs.approved == 'true'
+        env:
+          PR: ${{ steps.pr.outputs.pr }}
+          SHA: ${{ steps.pr.outputs.sha }}
+        run: |
+          if ! gh pr merge "$PR" --squash --delete-branch --match-head-commit "$SHA"; then
+            gh pr comment "$PR" --body "Not merged: the PR changed after you approved it, or GitHub refused the merge (conflict or branch protection). Check the PR, then approve again."
+            exit 1
+          fi
+
+      - name: Find the deploy workflow
+        id: findDeploy
+        if: steps.intent.outputs.approved == 'true'
+        run: |
+          wf="$DEPLOY_WORKFLOW"
+          if [ -z "$wf" ]; then
+            for f in deploy.yml deploy.yaml; do
+              if gh api "repos/$GH_REPO/contents/.github/workflows/$f" --jq .content 2>/dev/null \
+                  | base64 -d 2>/dev/null | grep -q 'workflow_dispatch'; then
+                wf="$f"; break
+              fi
+            done
+          fi
+          echo "workflow=$wf" >> "$GITHUB_OUTPUT"
+          echo "Deploy workflow: ${wf:-none}"
+
+      - name: Deploy
+        id: deploy
+        if: steps.intent.outputs.approved == 'true' && steps.findDeploy.outputs.workflow != ''
+        env:
+          PR: ${{ steps.pr.outputs.pr }}
+          DEPLOY_WORKFLOW: ${{ steps.findDeploy.outputs.workflow }}
+        run: |
+          # DEPLOY_WORKFLOW may name several workflows, space separated. Each is
+          # dispatched on the default branch and must succeed.
+          branch=$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name)
+          urls=""
+          for wf in $DEPLOY_WORKFLOW; do
+            before=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            gh workflow run "$wf" --ref "$branch"
+            run_id=""
+            for _ in $(seq 1 20); do
+              sleep 6
+              run_id=$(gh run list --workflow "$wf" --event workflow_dispatch --limit 5 \
+                --json databaseId,createdAt --jq "[.[] | select(.createdAt >= \"$before\")][0].databaseId // empty")
+              [ -n "$run_id" ] && break
+            done
+            if [ -z "$run_id" ]; then
+              gh pr comment "$PR" --body "Merged, but the deploy run ($wf) never started. Check that it has \`workflow_dispatch\`."
+              exit 1
+            fi
+            url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$run_id"
+            if ! gh run watch "$run_id" --exit-status --interval 15; then
+              gh pr comment "$PR" --body "Merged, but the deploy failed: $url. Production is still on the previous version unless the run says otherwise."
+              exit 1
+            fi
+            urls="$urls $url"
+          done
+          echo "url=${urls# }" >> "$GITHUB_OUTPUT"
+
+      - name: Report
+        if: steps.intent.outputs.approved == 'true'
+        env:
+          PR: ${{ steps.pr.outputs.pr }}
+          TICKET: ${{ steps.pr.outputs.ticket }}
+          DEPLOY_URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          if [ -n "$DEPLOY_URL" ]; then
+            msg="Shipped. Merged and deployed: $DEPLOY_URL"
+          else
+            msg="Shipped. Merged to the default branch; this repo deploys from there."
+          fi
+          gh pr comment "$PR" --body "$msg"
+          if [ -n "$TICKET" ]; then
+            gh issue edit "$TICKET" --add-label shipped || true
+            if [ "$(gh issue view "$TICKET" --json state --jq .state)" = "OPEN" ]; then
+              gh issue close "$TICKET" --reason completed --comment "$msg (PR #$PR)"
+            else
+              gh issue comment "$TICKET" --body "$msg (PR #$PR)"
+            fi
+          fi

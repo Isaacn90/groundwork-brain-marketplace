@@ -1,0 +1,35 @@
+name: Bug
+description: Something is broken. Claude finds the cause, fixes it and opens a PR for you to approve.
+title: "[Bug] "
+labels: ["bug", "claude"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What's broken?
+      placeholder: "Dragging a ticket to Done snaps it back to Review."
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen
+      placeholder: |
+        1. Open the board
+        2. Drag any ticket from Review to Done
+        3. Wait for the next refresh
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should happen instead?
+    validations:
+      required: true
+  - type: textarea
+    id: refs
+    attributes:
+      label: Error text, logs, screenshots
+      render: text
+    validations:
+      required: false
