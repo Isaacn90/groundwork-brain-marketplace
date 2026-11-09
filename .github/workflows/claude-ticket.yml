@@ -171,10 +171,13 @@ jobs:
           esac
           open=$(gh pr list -R "$GITHUB_REPOSITORY" --state open --limit 100 --json headRefName \
             --jq "[.[] | select(.headRefName | startswith(\"claude/issue-$N-\"))] | length")
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           if [ "$open" -gt 0 ]; then
             echo "Ticket #$N already has an open PR. Use @claude on the PR for changes."
+            gh issue comment "$N" -R "$GITHUB_REPOSITORY" --body "Not building: this ticket already has an open PR. Comment @claude on the PR for changes."
             echo "run=false" >> "$GITHUB_OUTPUT"
           else
+            gh issue comment "$N" -R "$GITHUB_REPOSITORY" --body "Confirmed, building now. The PR link lands here when it's ready. Progress: $run_url"
             echo "run=true" >> "$GITHUB_OUTPUT"
           fi
 
