@@ -178,7 +178,7 @@ jobs:
         run: |
           # DEPLOY_WORKFLOW may name several workflows, space separated. Each is
           # dispatched on the default branch and must succeed.
-          branch=$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name)
+          branch=$(gh repo view "$GITHUB_REPOSITORY" --json defaultBranchRef --jq .defaultBranchRef.name)
           urls=""
           for wf in $DEPLOY_WORKFLOW; do
             before=$(date -u +%Y-%m-%dT%H:%M:%SZ)
