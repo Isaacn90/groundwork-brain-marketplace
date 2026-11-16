@@ -66,7 +66,11 @@ if it describes a different layout, follow it and read the three names below as
    session, for example the tone of voice, a hard rule, or what the business
    sells, update `CLAUDE.md` itself as well.
 7. If the session surfaced something you could not resolve, add it to
-   `NEEDS-YOUR-EYES.md` at the brain root as a one-line question for the owner.
+   `NEEDS-YOUR-EYES.md` at the brain root as a question for the owner, with the
+   action that resolves it. If `_system/eyes.py` exists in the brain, file it with
+   `python3 _system/eyes.py add "Title" "Body" --do "…" --needs decide|do|claude --step "…" --step "…"`
+   rather than by hand: it takes the next free id and refuses an item with no
+   `Do:` line, which is the line that tells the owner how to action it.
 
 ## Output
 

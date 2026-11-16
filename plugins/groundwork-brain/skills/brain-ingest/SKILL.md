@@ -41,7 +41,12 @@ if it describes a different layout, follow it and read the three names below as
    `timestamp`, `wiki_status: pending`), and move the original into
    `inbox/_processed/`. Convert, do not summarise. If a file cannot be read (a
    scanned image, a password-protected document, an unsupported format), leave
-   it in place, say so, and add a line to `NEEDS-YOUR-EYES.md`. Never guess at
+   it in place, say so, and add an item to `NEEDS-YOUR-EYES.md` naming the file
+   and what would make it readable. If `_system/eyes.py` exists in the brain, file it with
+   `python3 _system/eyes.py add "Title" "Body" --do "…" --needs decide|do|claude --step "…" --step "…"`
+   rather than by hand: it takes the next free id and refuses an item with no
+   `Do:` line, which is the line that tells the owner how to action it.
+   Never guess at
    what an unread file says. Some brains run a local watcher that already does
    this within about a minute of a file landing in `inbox/`; if so this step
    finds nothing to do, which is a normal result, not a failure.

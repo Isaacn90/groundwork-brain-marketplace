@@ -60,10 +60,36 @@ Work through each check and record what you find:
 9. **Contradictions.** Two pages stating incompatible facts. Read the pages,
    do not guess from titles.
 10. **Credentials.** Passwords, PINs, licence keys, and account numbers sitting
-   in the wiki. They came from the owner's own documents, so nothing has
-   leaked, but everything in a connected folder is readable while Claude works.
-   List them and leave the decision to the owner. Never delete one, and never
-   quote the value into `NEEDS-YOUR-EYES.md`: name the page instead.
+    in the wiki. They came from the owner's own documents, so nothing has
+    leaked, but everything in a connected folder is readable while Claude works.
+    List them and leave the decision to the owner. Never delete one, and never
+    quote the value into `NEEDS-YOUR-EYES.md`: name the page instead.
+11. **Uncovered projects.** Skip if the brain has no `projects/` folder.
+    Every directory under `projects/` should be
+    reachable from a wiki topic page: either its own dedicated page, or a
+    section of its own in `wiki/topics/internal-tooling.md`. A project
+    directory covered by neither is undocumented.
+12. **Vault duplicates.** Skip if no notes vault sits beside the brain (a
+    `_vault/Projects/` folder in the brain's parent directory). Files there that
+    restate a wiki topic's content instead of pointing to it. The vault
+    should hold a pointer to the wiki's page, not a forked copy of it that
+    can drift out of sync.
+13. **Instrumentation.** Each part applies only if its script exists in the
+    brain's `_system/` folder; skip a missing one without reporting it.
+    a. Run `_system/cost-report.sh`. Replace the `Cost last 7 days:` line in
+       `hot.md` with its output. If it printed `unavailable`, say so as a
+       finding rather than leaving a stale line.
+    b. Run `_system/drift.py`. Report the page, `behind_refs`, and `stale`
+       counts in the health report. If `behind_refs` is non-empty, file each
+       page it names into `NEEDS-YOUR-EYES.md` via `python3 _system/eyes.py
+       add "<page> is behind its refs" "<what changed>" --do "Re-verify the
+       page against its refs and bump last-verified." --needs claude`.
+    c. Monthly only: on the first health run of the calendar month, also run
+       `_system/eval/run-eval.sh`. Write `_reports/eval-YYYY-MM-DD.md` with
+       the results table, and replace the `Brain accuracy:` line in `hot.md`
+       with its summary line. Skip on every other run of the month, and say
+       plainly that it was skipped because it already ran this month, not
+       just silently omit it.
 
 ## Output
 
